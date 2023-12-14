@@ -1,0 +1,7 @@
+
+This is line 1.
+Here comes line 2.
+And now, line 3.
+Testing producer-consumer in C.
+Feel free to add more lines for testing.
+This is the last line.
