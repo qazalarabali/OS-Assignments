@@ -75,11 +75,11 @@ int main(int argc, char *argv[]) {
 void *producer(void *arg) {
     SharedData *shared_data = (SharedData *)arg;
 
-    while (!feof(shared_data->input_file)) {
+    while (1) {
         pthread_mutex_lock(&shared_data->mutex);
 
-        // Wait for the consumer to consume the data
-        while (shared_data->buffer_full) {
+        // Wait for the consumer to consume the data or detect end of file
+        while (shared_data->buffer_full && !feof(shared_data->input_file)) {
             pthread_cond_wait(&shared_data->cond_producer, &shared_data->mutex);
         }
 
@@ -93,8 +93,10 @@ void *producer(void *arg) {
         pthread_cond_signal(&shared_data->cond_consumer);
         pthread_mutex_unlock(&shared_data->mutex);
 
-        // Reset the buffer status
-        shared_data->buffer_empty = 1;
+        // Check if the producer has finished
+        if (feof(shared_data->input_file)) {
+            break;
+        }
     }
 
     // Signal the consumer that the producer has finished
@@ -113,8 +115,8 @@ void *consumer(void *arg) {
     while (1) {
         pthread_mutex_lock(&shared_data->mutex);
 
-        // Wait for the producer to fill the buffer
-        while (shared_data->buffer_empty) {
+        // Wait for the producer to fill the buffer or detect end of file
+        while (shared_data->buffer_empty && !feof(shared_data->input_file)) {
             pthread_cond_wait(&shared_data->cond_consumer, &shared_data->mutex);
         }
 
@@ -129,8 +131,9 @@ void *consumer(void *arg) {
         pthread_mutex_unlock(&shared_data->mutex);
 
         // Check if the producer has finished
-        if (feof(shared_data->input_file))
+        if (feof(shared_data->input_file) && shared_data->buffer_empty) {
             break;
+        }
     }
 
     pthread_exit(NULL);
