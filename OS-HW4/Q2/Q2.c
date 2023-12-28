@@ -28,8 +28,6 @@ void* p2(void* arg) {
     printf("C\n");
     printf("B\n");
 
-    printf("C\n");
-    printf("B\n");
     return NULL;
 }
 
