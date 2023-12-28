@@ -28,27 +28,58 @@ void* withdraw(void* arg) {
     int customerID = transaction->customer_id;
 
     pthread_mutex_lock(&customerMutex[customerID]);
-    if (customerStock[customerID] >= transaction->amount) {
+    if (customerStock[customerID] >= transaction->amount) 
+    {
+        pthread_mutex_lock(&safeBoxMutex);
         customerStock[customerID] -= transaction->amount;
         printf("Customer %d withdrew %.2f. New balance: %.2f\t ------------ > safe-box value: %.2f\n",
            customerID, transaction->amount, customerStock[customerID], safeBox);
+        pthread_mutex_unlock(&safeBoxMutex);
         pthread_mutex_unlock(&customerMutex[customerID]);
-    } else {
+
+    } else 
+    {
         double amountTakenFromBalance = customerStock[customerID];
-        customerStock[customerID] -= transaction->amount;
         pthread_mutex_lock(&safeBoxMutex);
-        safeBox += customerStock[customerID];
-        if(amountTakenFromBalance < 0)
+
+        if( amountTakenFromBalance <= 0 )
         {
-            printf("Customer %d withdrew 0 from account balance and %.2f from safe-box . New balance: %.2f\t ------------ > safe-box value: %.2f\n",
-               customerID,(-1 *customerStock[customerID]),customerStock[customerID], safeBox);
+            if(safeBox < transaction->amount)
+            {
+                //in this case the amount of transition is more that safe box and customer's balance so that can not be done 
+                printf("This transition from Customer %d has this amount %.2f and can not be completed cause safebox has %.2f and customer balance is %.2f  and it is not enough!\n",customerID,transaction->amount,safeBox,customerStock[customerID]);
+                pthread_mutex_unlock(&safeBoxMutex);
+            } 
+            else
+            {
+                safeBox -= transaction->amount;
+                customerStock[customerID] -= transaction->amount;
+                printf("Customer %d withdrew 0 from account balance and %.2f from safe-box . New balance: %.2f\t ------------ > safe-box value: %.2f\n",
+                    customerID,transaction->amount,customerStock[customerID], safeBox);
+                pthread_mutex_unlock(&safeBoxMutex);
+            }
+            
         }
         else
         {
-            printf("Customer %d withdrew %.2f from account balance and %.2f from safe-box means %.2f  from both . New balance: %.2f\t ------------ > safe-box value: %.2f\n",
-               customerID,amountTakenFromBalance,(-1 *customerStock[customerID]),transaction->amount,customerStock[customerID], safeBox);
+            customerStock[customerID] -= transaction->amount;
+            if(safeBox < (-1 *customerStock[customerID]))
+            {
+                //in this case the amount of transition is more that safe box and customer's balance so that can not be done 
+                printf("This transition from customer %d has this amount %.2f and can not be completed cause safebox has %.2f and customer balance is %.2f and it is not enough! !!!!!\n",customerID,transaction->amount,safeBox,customerStock[customerID]);
+                pthread_mutex_unlock(&safeBoxMutex);
+            }
+            else
+            {
+                
+                safeBox += customerStock[customerID];
+                printf("Customer %d withdrew %.2f from account balance and %.2f from safe-box means %.2f  from both . New balance: %.2f\t ------------ > safe-box value: %.2f\n",
+                    customerID,amountTakenFromBalance,(-1 *customerStock[customerID]),transaction->amount,customerStock[customerID], safeBox);
+                pthread_mutex_unlock(&safeBoxMutex);    
+            }
+            
         }
-        pthread_mutex_unlock(&safeBoxMutex);
+
         pthread_mutex_unlock(&customerMutex[customerID]);
         return NULL;
     }
@@ -72,7 +103,7 @@ void* deposit(void* arg) {
             pthread_mutex_lock(&safeBoxMutex);
             double amountGiven = transaction->amount + customerStock[customerID];
             safeBox += (customerStock[customerID] * -1);
-            customerStock[customerID] += amountGiven ;
+            customerStock[customerID] += amountGiven + (customerStock[customerID] * -1);
             printf("Customer %d stock was charged by %.2f. New balance: %.2f\t ------------ > safe-box value: %.2f\n",
                 customerID, transaction->amount, customerStock[customerID], safeBox);
             pthread_mutex_unlock(&safeBoxMutex);
@@ -91,9 +122,11 @@ void* deposit(void* arg) {
     }
     else
     {
+        pthread_mutex_lock(&safeBoxMutex);
         customerStock[customerID] += transaction->amount;
         printf("Customer %d stock was charged by %.2f. New balance: %.2f\t ------------ > safe-box value: %.2f\n",
             customerID, transaction->amount, customerStock[customerID], safeBox);
+        pthread_mutex_unlock(&safeBoxMutex);    
         pthread_mutex_unlock(&customerMutex[customerID]);
     }
     return NULL;
@@ -113,7 +146,7 @@ int main() {
 
     for (int i = 0; i < NUM_TRANSACTION; ++i) {
         transaction_t* transaction = (transaction_t*)malloc(sizeof(transaction_t));
-        transaction->amount = rand() % 500 + 1; // Random amount between 1 and 50
+        transaction->amount = rand() % 800 + 1; // Random amount between 1 and 50
         transaction->customer_id = rand() % NUM_CUSTOMERS;
 
         if (rand() % 2 == 0) {
