@@ -1,81 +1,74 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h>
 #include <unistd.h>
-#include <stdlib.h>
 
-#define NUM_RESOURCES 5
-#define NUM_THREADS 10
+#define NUMBER_OF_RESOURCES 5
+#define NUMBER_OF_THREAD 10
 
 typedef struct {
-    int resources[NUM_RESOURCES];
+    int resources[NUMBER_OF_RESOURCES];
     sem_t availableResources;
     pthread_mutex_t poolMutex;
 } ResourceManager;
 
-ResourceManager resourceManager;
+ResourceManager RManger;
 
-void *threadFunction(void *threadId) {
-    int id = *((int *)threadId);
-
-    // Simulate work with a random duration
-    int workDuration = rand() % 5 + 1;
-    sleep(workDuration);
-
-    // Acquire resource
-    sem_wait(&resourceManager.availableResources);
-    pthread_mutex_lock(&resourceManager.poolMutex);
-
-    // Find a random available resource
-    int resourceId = -1;
-    while (resourceId == -1) {
-        int randomResource = rand() % NUM_RESOURCES;
-        if (resourceManager.resources[randomResource] == -1) {
-            resourceId = randomResource;
-            resourceManager.resources[resourceId] = id;
+void* threadFunc(void* arg) 
+{
+    int threadNum = *(int*)arg;
+    sem_wait(&RManger.availableResources); // Wait for available resource
+    int resource_avail = -1;
+    pthread_mutex_lock(&RManger.poolMutex); // Acquire lock on resource pool
+    for (int i = 0; i < NUMBER_OF_RESOURCES; i++) 
+    {
+        if (RManger.resources[i] == -1) 
+        { 
+            // Find an available resource
+            RManger.resources[i] = threadNum; // Assign the resource to the current thread
+            resource_avail = i;
+            break;
         }
     }
+    pthread_mutex_unlock(&RManger.poolMutex); // Release lock on resource pool
 
-    // Release mutex and resource
-    pthread_mutex_unlock(&resourceManager.poolMutex);
-    printf("Thread %d is performing work with resource %d\n", id, resourceId + 1);
+    srand(time(NULL));
+    printf("Thread %d is performing work with resource %d\n", threadNum, resource_avail + 1);
+    sleep(rand() % 10); // Simulate work being done
 
-    // Simulate resting time
-    sleep(2);
+    pthread_mutex_lock(&RManger.poolMutex); // Acquire lock on resource pool
+    RManger.resources[resource_avail] = -1; // Release the resource
+    pthread_mutex_unlock(&RManger.poolMutex); // Release lock on resource pool
 
-    // Release resource
-    pthread_mutex_lock(&resourceManager.poolMutex);
-    resourceManager.resources[resourceId] = -1;
-    pthread_mutex_unlock(&resourceManager.poolMutex);
-    sem_post(&resourceManager.availableResources);
-
+    sem_post(&RManger.availableResources); // Release the resource
+    free(arg);
     pthread_exit(NULL);
 }
 
-int main() {
-    // Initialize resources and semaphore
-    for (int i = 0; i < NUM_RESOURCES; ++i) {
-        resourceManager.resources[i] = -1;
-    }
-    sem_init(&resourceManager.availableResources, 0, NUM_RESOURCES);
-    pthread_mutex_init(&resourceManager.poolMutex, NULL);
+int main() 
+{
+    pthread_t threads[NUMBER_OF_THREAD];
+    pthread_mutex_init(&RManger.poolMutex, NULL);
+    sem_init(&RManger.availableResources, 0, NUMBER_OF_RESOURCES); // Initialize semaphore with the number of resources
 
-    // Create threads
-    pthread_t threads[NUM_THREADS];
-    int threadIds[NUM_THREADS];
-    for (int i = 0; i < NUM_THREADS; ++i) {
-        threadIds[i] = i + 1;
-        pthread_create(&threads[i], NULL, threadFunction, (void *)&threadIds[i]);
+    for (int i = 0; i < NUMBER_OF_RESOURCES; i++) 
+    {
+        RManger.resources[i] = -1; // Initialize resources as unallocated
     }
 
-    // Join threads
-    for (int i = 0; i < NUM_THREADS; ++i) {
-        pthread_join(threads[i], NULL);
+    for (int i = 0; i < NUMBER_OF_THREAD; i++) 
+    {
+        int* threadNum = malloc(sizeof(int));
+        *threadNum = i + 1;
+        pthread_create(&threads[i], NULL, threadFunc, threadNum); // Create threads
     }
 
-    // Clean up
-    sem_destroy(&resourceManager.availableResources);
-    pthread_mutex_destroy(&resourceManager.poolMutex);
+    for (int i = 0; i < NUMBER_OF_THREAD; i++) 
+    {
+        pthread_join(threads[i], NULL); // Wait for threads to finish
+    }
 
     return 0;
 }
