@@ -26,19 +26,19 @@ void *threadFunction(void *threadId) {
     sem_wait(&resourceManager.availableResources);
     pthread_mutex_lock(&resourceManager.poolMutex);
 
-    // Find an available resource
+    // Find a random available resource
     int resourceId = -1;
-    for (int i = 0; i < NUM_RESOURCES; ++i) {
-        if (resourceManager.resources[i] < 0) {
-            resourceId = i;
-            resourceManager.resources[i] = id;
-            break;
+    while (resourceId == -1) {
+        int randomResource = rand() % NUM_RESOURCES;
+        if (resourceManager.resources[randomResource] == -1) {
+            resourceId = randomResource;
+            resourceManager.resources[resourceId] = id;
         }
     }
 
     // Release mutex and resource
     pthread_mutex_unlock(&resourceManager.poolMutex);
-    printf("Thread %d  is performing work with resource %d\n", id, resourceId + 1);
+    printf("Thread %d is performing work with resource %d\n", id, resourceId + 1);
 
     // Simulate resting time
     sleep(2);
