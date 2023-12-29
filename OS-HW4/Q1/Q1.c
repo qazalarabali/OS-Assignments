@@ -81,13 +81,7 @@ void* withdraw(void* arg) {
         }
 
         pthread_mutex_unlock(&customerMutex[customerID]);
-        return NULL;
     }
-
-    
-    
-    
-    
     return NULL;
 }
 
@@ -133,6 +127,7 @@ void* deposit(void* arg) {
 }
 
 int main() {
+    
     srand(time(NULL));
 
     // Initialize customer stocks and mutexes
@@ -146,7 +141,7 @@ int main() {
 
     for (int i = 0; i < NUM_TRANSACTION; ++i) {
         transaction_t* transaction = (transaction_t*)malloc(sizeof(transaction_t));
-        transaction->amount = rand() % 800 + 1; // Random amount between 1 and 50
+        transaction->amount = rand() % 800 + 1; // Random amount between 1 and 800
         transaction->customer_id = rand() % NUM_CUSTOMERS;
 
         if (rand() % 2 == 0) {
